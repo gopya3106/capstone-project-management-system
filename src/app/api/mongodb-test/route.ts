@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMongoDb } from "@/lib/mongodb";
+import { getMongoDb, isMongoConfigured } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,16 @@ export async function GET() {
         message: "This diagnostic health-check endpoint is disabled in production.",
       },
       { status: 403 }
+    );
+  }
+
+  if (!isMongoConfigured()) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "MongoDB is not configured (MONGODB_URI is not set). History features are disabled.",
+      },
+      { status: 503 }
     );
   }
 

@@ -9,8 +9,9 @@ import { getStudents, getStudentStats } from "@/lib/students";
 export const dynamic = "force-dynamic";
 
 export default async function AdminStudentsPage() {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireAdmin();
   } catch {
     redirect("/login");
   }
@@ -50,7 +51,7 @@ export default async function AdminStudentsPage() {
         </header>
 
         {/* Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Stats Strip */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

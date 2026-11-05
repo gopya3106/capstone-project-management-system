@@ -12,8 +12,9 @@ interface Props {
 }
 
 export default async function GroupDetailPage({ params }: Props) {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireAdmin();
   } catch {
     redirect("/login");
   }
@@ -74,7 +75,7 @@ export default async function GroupDetailPage({ params }: Props) {
         </header>
 
         {/* Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Group Metadata Overview */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -125,7 +126,7 @@ export default async function GroupDetailPage({ params }: Props) {
               {group.capstone_project?.project_title || "Pending Allocation"}
             </div>
             <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-              {group.capstone_project?.project_status || "Not Started"}
+              {group.capstone_project?.project_status || "No project yet"}
             </p>
           </div>
         </div>

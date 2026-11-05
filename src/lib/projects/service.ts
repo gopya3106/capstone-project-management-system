@@ -18,7 +18,7 @@ export async function getProjectStats(): Promise<ProjectStats> {
   const countsSql = `
     SELECT
       COUNT(*) AS totalProjects,
-      SUM(CASE WHEN project_status = 'Not Started' THEN 1 ELSE 0 END) AS notStartedCount,
+      SUM(CASE WHEN project_status IN ('Proposed','Under Review','Approved') THEN 1 ELSE 0 END) AS notStartedCount,
       SUM(CASE WHEN project_status = 'In Progress' THEN 1 ELSE 0 END) AS inProgressCount,
       SUM(CASE WHEN project_status = 'On Hold' THEN 1 ELSE 0 END) AS onHoldCount,
       SUM(CASE WHEN project_status = 'Completed' THEN 1 ELSE 0 END) AS completedCount
@@ -357,7 +357,7 @@ export async function createProject(input: CreateProjectInput): Promise<{
     input.proposed_methodology?.trim() || null,
     input.technology_stack?.trim() || null,
     input.current_phase_id || 1, // default to Phase 1 (Problem Definition & Planning)
-    input.project_status || "Not Started",
+    input.project_status || "Proposed",
     input.start_date || new Date().toISOString().slice(0, 10),
     input.expected_end_date || null,
     input.repository_url?.trim() || null,

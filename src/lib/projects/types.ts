@@ -3,7 +3,10 @@
  */
 
 export const PROJECT_STATUSES = [
-  "Not Started",
+  "Proposed",
+  "Under Review",
+  "Approved",
+  "Rejected",
   "In Progress",
   "On Hold",
   "Completed",

@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { ProjectDetailsView } from "@/components/admin/ProjectDetailsView";
 import { getProjectById } from "@/lib/projects";
+import { ProjectWorkflowPanel } from "@/components/workflow/ProjectWorkflowPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +14,9 @@ interface Props {
 }
 
 export default async function AdminProjectDetailPage({ params }: Props) {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireStaff();
   } catch {
     redirect("/login");
   }
@@ -60,10 +62,13 @@ export default async function AdminProjectDetailPage({ params }: Props) {
         </div>
 
         {/* Admin Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Interactive Project Details View */}
         <ProjectDetailsView initialProject={project} />
+
+        {/* Proposal, milestone submission and marks history */}
+        <ProjectWorkflowPanel projectId={project.project_id} groupId={project.group_id} />
       </div>
     </div>
   );

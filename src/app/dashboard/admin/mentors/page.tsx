@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { MentorListingTable } from "@/components/admin/MentorListingTable";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminMentorsPage() {
   let session;
   try {
-    session = await requireAdmin();
+    session = await requireStaff();
   } catch {
     redirect("/login");
   }
@@ -46,7 +46,7 @@ export default async function AdminMentorsPage() {
         </header>
 
         {/* Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Mentor Metrics Summary */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

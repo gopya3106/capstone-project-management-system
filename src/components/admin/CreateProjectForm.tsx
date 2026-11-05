@@ -26,7 +26,7 @@ export function CreateProjectForm({ availableGroups }: Props) {
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [expectedEndDate, setExpectedEndDate] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
-  const [projectStatus, setProjectStatus] = useState<string>("Not Started");
+  const [projectStatus, setProjectStatus] = useState<string>("Proposed");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

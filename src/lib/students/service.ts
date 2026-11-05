@@ -346,7 +346,7 @@ export async function createStudent(input: CreateStudentInput): Promise<{
   return withTransaction(async (conn) => {
     // 1. Check for duplicate email or USN
     const [existingUsers] = await conn.execute(
-      "SELECT user_id FROM Users WHERE LOWER(email) = LOWER(?) LIMIT 1",
+      "SELECT user_id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1",
       [input.email.trim()]
     );
     if (Array.isArray(existingUsers) && existingUsers.length > 0) {
@@ -354,7 +354,7 @@ export async function createStudent(input: CreateStudentInput): Promise<{
     }
 
     const [existingStudents] = await conn.execute(
-      "SELECT student_id FROM Students WHERE UPPER(usn) = UPPER(?) LIMIT 1",
+      "SELECT student_id FROM students WHERE UPPER(usn) = UPPER(?) LIMIT 1",
       [input.usn.trim()]
     );
     if (Array.isArray(existingStudents) && existingStudents.length > 0) {
@@ -367,7 +367,7 @@ export async function createStudent(input: CreateStudentInput): Promise<{
 
     // 3. Insert into Users table
     const [userResult] = await conn.execute(
-      `INSERT INTO Users (full_name, email, password_hash, role, phone_number, account_status)
+      `INSERT INTO users (full_name, email, password_hash, role, phone_number, account_status)
        VALUES (?, ?, ?, 'Student', ?, 'Active')`,
       [
         input.full_name.trim(),
@@ -380,7 +380,7 @@ export async function createStudent(input: CreateStudentInput): Promise<{
 
     // 4. Insert into Students table
     const [studentResult] = await conn.execute(
-      `INSERT INTO Students (user_id, usn, department, specialization, batch, current_semester, section, cgpa, academic_status)
+      `INSERT INTO students (user_id, usn, department, specialization, batch, current_semester, section, cgpa, academic_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')`,
       [
         userId,
@@ -413,7 +413,7 @@ export async function updateStudent(
   return withTransaction(async (conn) => {
     // 1. Verify student exists
     const [existing] = await conn.execute(
-      "SELECT student_id, user_id FROM Students WHERE student_id = ? LIMIT 1",
+      "SELECT student_id, user_id FROM students WHERE student_id = ? LIMIT 1",
       [studentId]
     );
     if (!Array.isArray(existing) || existing.length === 0) {
@@ -439,7 +439,7 @@ export async function updateStudent(
       if (userUpdates.length > 0) {
         userParams.push(student.user_id);
         await conn.execute(
-          `UPDATE Users SET ${userUpdates.join(", ")} WHERE user_id = ?`,
+          `UPDATE users SET ${userUpdates.join(", ")} WHERE user_id = ?`,
           userParams
         );
       }
@@ -482,7 +482,7 @@ export async function updateStudent(
     if (studentUpdates.length > 0) {
       studentParams.push(studentId);
       await conn.execute(
-        `UPDATE Students SET ${studentUpdates.join(", ")} WHERE student_id = ?`,
+        `UPDATE students SET ${studentUpdates.join(", ")} WHERE student_id = ?`,
         studentParams
       );
     }

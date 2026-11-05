@@ -75,7 +75,13 @@ export function ProjectListingTable({ initialProjects, total }: Props) {
         return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800";
       case "Cancelled":
         return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border-rose-200 dark:border-rose-800";
-      case "Not Started":
+      case "Approved":
+        return "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-800";
+      case "Under Review":
+        return "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 border-violet-200 dark:border-violet-800";
+      case "Rejected":
+        return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border-rose-200 dark:border-rose-800";
+      case "Proposed":
       default:
         return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700";
     }
@@ -112,7 +118,10 @@ export function ProjectListingTable({ initialProjects, total }: Props) {
             className="rounded-lg border border-zinc-300 bg-zinc-50 px-2.5 py-2 text-xs text-zinc-700 focus:bg-white focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
           >
             <option value="ALL">All Statuses</option>
-            <option value="Not Started">Not Started</option>
+            <option value="Proposed">Proposed</option>
+            <option value="Under Review">Under Review</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
             <option value="In Progress">In Progress</option>
             <option value="On Hold">On Hold</option>
             <option value="Completed">Completed</option>

@@ -2,7 +2,7 @@
  * CPMS User Roles.
  * Strictly enforced across database queries, JWT claims, and authorization checks.
  */
-export const USER_ROLES = ["Student", "Mentor", "Admin"] as const;
+export const USER_ROLES = ["Student", "Mentor", "Coordinator", "Admin"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 /**
@@ -13,6 +13,7 @@ export interface DbUser {
   email: string;
   password_hash: string;
   role: UserRole;
+  account_status?: "Active" | "Inactive" | "Suspended";
   created_at: Date | string;
 }
 

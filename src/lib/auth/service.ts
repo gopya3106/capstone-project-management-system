@@ -25,8 +25,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
  */
 export async function findUserByEmail(email: string): Promise<DbUser | null> {
   const sql = `
-    SELECT user_id, email, password_hash, role, created_at
-    FROM Users
+    SELECT user_id, email, password_hash, role, account_status, created_at
+    FROM users
     WHERE LOWER(email) = LOWER(?)
     LIMIT 1
   `;
@@ -43,7 +43,7 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
 export async function findUserById(userId: number): Promise<SafeUser | null> {
   const sql = `
     SELECT user_id, email, role, created_at
-    FROM Users
+    FROM users
     WHERE user_id = ?
     LIMIT 1
   `;
@@ -96,6 +96,10 @@ export async function authenticateUser(input: LoginInput): Promise<SafeUser> {
   const isMatch = await verifyPassword(input.password, user.password_hash);
   if (!isMatch) {
     throw new Error("Invalid email or password.");
+  }
+
+  if (user.account_status && user.account_status !== "Active") {
+    throw new Error("This account is not active. Please contact the administrator.");
   }
 
   return {

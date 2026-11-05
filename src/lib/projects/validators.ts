@@ -27,7 +27,7 @@ export const createProjectSchema = z.object({
   proposed_methodology: z.string().trim().optional().nullable(),
   technology_stack: z.string().trim().optional().nullable(),
   current_phase_id: z.coerce.number().int().positive().optional().nullable(),
-  project_status: z.enum(PROJECT_STATUSES).default("Not Started"),
+  project_status: z.enum(PROJECT_STATUSES).default("Proposed"),
   start_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format.")

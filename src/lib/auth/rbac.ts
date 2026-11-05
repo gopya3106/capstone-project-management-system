@@ -71,6 +71,24 @@ export async function requireAdmin(): Promise<SessionPayload> {
 }
 
 /**
+ * Convenience check for Coordinator role.
+ */
+export async function requireCoordinator(): Promise<SessionPayload> {
+  return requireRole("Coordinator");
+}
+
+/**
+ * Staff = Admin or Coordinator (proposal review, milestones, guide allocation, reports).
+ */
+export async function requireStaff(): Promise<SessionPayload> {
+  return requireRole(["Admin", "Coordinator"]);
+}
+
+export function isStaffRole(role: UserRole): boolean {
+  return role === "Admin" || role === "Coordinator";
+}
+
+/**
  * Maps a verified role to its dedicated dashboard route.
  */
 export function getRoleDashboardPath(role: UserRole): string {
@@ -79,6 +97,7 @@ export function getRoleDashboardPath(role: UserRole): string {
       return "/dashboard/student";
     case "Mentor":
       return "/dashboard/mentor";
+    case "Coordinator":
     case "Admin":
       return "/dashboard/admin";
   }

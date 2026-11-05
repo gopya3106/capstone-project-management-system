@@ -334,7 +334,7 @@ export async function createGroup(input: CreateGroupInput): Promise<{
       const [projectResult] = await conn.execute(
         `INSERT INTO capstone_projects
            (group_id, project_title, project_domain, project_status, start_date)
-         VALUES (?, ?, ?, 'Not Started', CURDATE())`,
+         VALUES (?, ?, ?, 'Proposed', CURDATE())`,
         [
           groupId,
           input.project_title.trim(),

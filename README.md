@@ -50,20 +50,28 @@ CPMS uses a **polyglot persistence** architecture to separate authoritative rela
 CPMS implements secure, server-side authentication and role-based access control (RBAC) backed by the authoritative MySQL `Users` table.
 
 ### User Roles
-- `Student`: Access to student dashboard (`/dashboard/student`), project proposals, submission uploads.
-- `Mentor`: Access to mentor dashboard (`/dashboard/mentor`), project group reviews, feedback recording.
-- `Admin`: Access to administration dashboard (`/dashboard/admin`), guide allocation, user management.
+- `Student`: student dashboard (`/dashboard/student`): group and project details, proposal submission, milestone document submission, feedback, marks.
+- `Mentor` (Faculty Guide / Evaluator): mentor dashboard (`/dashboard/mentor`): assigned projects, submission review, evaluation marks.
+- `Coordinator`: staff console (`/dashboard/admin`): proposal approval, guide allocation, milestones, submission monitoring, reports.
+- `Admin`: everything the Coordinator can do, plus student, group and user records.
 
-### Authoritative MySQL `Users` Schema
+### Authoritative MySQL `users` Schema
+The full schema lives in [`db/001_core_schema.sql`](db/001_core_schema.sql). The `users` table:
 ```sql
-CREATE TABLE IF NOT EXISTS Users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role ENUM('Student', 'Mentor', 'Admin') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS users (
+    user_id         INT AUTO_INCREMENT PRIMARY KEY,
+    full_name       VARCHAR(120)  NOT NULL,
+    email           VARCHAR(255)  NOT NULL,
+    password_hash   VARCHAR(255)  NOT NULL,
+    role            ENUM('Student', 'Mentor', 'Coordinator', 'Admin') NOT NULL,
+    phone_number    VARCHAR(20)   NULL,
+    account_status  ENUM('Active', 'Inactive', 'Suspended') NOT NULL DEFAULT 'Active',
+    created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_users_email UNIQUE (email)
 );
 ```
+Only `Active` accounts can sign in.
 
 ### Security Architecture
 1. **Password Verification**: Passwords are verified against bcrypt hashes using `bcryptjs`. Plaintext passwords are never stored or compared.
@@ -96,9 +104,10 @@ MYSQL_DATABASE=cpms_db
 SESSION_SECRET=<minimum_32_character_cryptographic_secret>
 
 # ==========================================
-# MongoDB Atlas Configuration
+# MongoDB Atlas Configuration (OPTIONAL)
 # ==========================================
-# Replace placeholders with your Atlas cluster details
+# Leave these out to run on MySQL only; activity / submission-history /
+# feedback-history logging is then skipped. Replace placeholders with your Atlas cluster details
 MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/?retryWrites=true&w=majority
 MONGODB_DATABASE=cpms_nosql
 ```
@@ -110,9 +119,9 @@ MONGODB_DATABASE=cpms_nosql
 ## 4. Getting Started
 
 ### Prerequisites
-- Node.js 18+ or 20+
-- MySQL Server 8.0 running locally on port 3306 with database `cpms_db`
-- MongoDB Atlas free cluster
+- Node.js 20+
+- MySQL Server 8.0.16 or newer (CHECK constraints are enforced from 8.0.16)
+- MongoDB Atlas free cluster (optional)
 
 ### Installation & Execution
 
@@ -121,18 +130,47 @@ MONGODB_DATABASE=cpms_nosql
    npm install
    ```
 
-2. Run the development server:
+2. Create `.env.local` (see section 3).
+
+3. Create the database: tables, views, triggers and stored procedures. Add `--seed` for demo data:
+   ```bash
+   npm run db:setup -- --seed
+   ```
+   - On an **existing** database, `npm run db:setup` upgrades it in place: it adds the new tables and the `Coordinator` role, and moves the old `Not Started` project status to `Proposed`. Existing rows are kept.
+   - `npm run db:reset` drops the database and rebuilds it with demo data (asks for confirmation).
+   - The script runs the files in `db/` in order. You can also run them yourself in MySQL Workbench or the `mysql` CLI.
+
+4. Run the development server and open [http://localhost:3000](http://localhost:3000):
    ```bash
    npm run dev
    ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
-4. Navigate to `/login` to access the CPMS Portal Login page.
-
-5. Run production build check:
+5. Production build check:
    ```bash
    npm run build
    ```
+
+### Demo accounts (after `--seed`)
+All demo accounts use the password **`Cpms@2026`**. They are for local demonstration only.
+
+| Role | Email | What to look at |
+| :--- | :--- | :--- |
+| Admin | `admin@cpms.demo` | Full console including students and groups |
+| Coordinator | `coordinator@cpms.demo` | Proposals awaiting review, delayed project, reports |
+| Mentor | `anita.rao@cpms.demo` | Team Alpha: reviewed submissions and marks |
+| Mentor | `vikram.shetty@cpms.demo` | Team Quantum: delayed, revision requested |
+| Student | `aarav@student.cpms.demo` | Team Alpha leader: on-time and late submissions, marks |
+| Student | `priya@student.cpms.demo` | Team Orion: proposal awaiting review |
+| Student | `rahul@student.cpms.demo` | Team Helix: rejected v1, v2 under review |
+| Student | `varun@student.cpms.demo` | Not in any group |
+
+### Running all tests
+With `npm run dev` running in another terminal:
+```bash
+# PowerShell:  $env:DEMO_ADMIN_PASSWORD="Cpms@2026"; npm run test:all
+DEMO_ADMIN_PASSWORD="Cpms@2026" npm run test:all
+```
+Phase 2 and 3 expect the seeded demo data. Phase 4 creates and removes its own data.
 
 ---
 
@@ -295,4 +333,80 @@ This automated suite validates:
 - Duplicate active assignment rejection and atomic Primary mentor transitions.
 - Ending mentor allocations via `DELETE /api/admin/mentors/allocations` and database state verification.
 
+---
+
+## 10. Proposal, Milestone, Submission and Evaluation Workflow (Phase 4)
+
+```
+Group formation -> Proposal (student) -> Coordinator review -> Guide allocation
+  -> Milestones (coordinator) -> Document submission (student) -> Faculty review
+  -> Evaluation marks (faculty) -> Final marks -> Project completion
+```
+
+### New tables ([`db/002_workflow_schema.sql`](db/002_workflow_schema.sql))
+| Table | Purpose | Key constraints |
+| :--- | :--- | :--- |
+| `proposals` | Versioned proposals per group | `UNIQUE (group_id, version_no)`, title CHECK, FK to group / student / reviewer |
+| `milestones` | Review checkpoints per academic year | `UNIQUE (academic_year, milestone_order)`, CHECK on marks and weightage |
+| `submissions` | Versioned documents per project and milestone | `UNIQUE (project_id, milestone_id, version_no)`, URL CHECK, `is_late` flag |
+| `evaluations` | One evaluator's review of one milestone | `UNIQUE (project_id, milestone_id, evaluator_id)` |
+| `student_evaluations` | Individual marks per student | `UNIQUE (evaluation_id, student_id)`, marks ≥ 0 |
+| `final_results` | Output of the final-mark procedure | PK `(project_id, student_id)`, total 0–100 |
+| `notifications` | In-app messages | Index `(user_id, is_read, created_at)` |
+
+Marks live only in `student_evaluations`. Group averages, weighted totals and workload are derived in views, so nothing is stored twice (3NF).
+
+### Rules enforced in the database ([`db/004_triggers_procedures.sql`](db/004_triggers_procedures.sql))
+| Object | Type | What it does |
+| :--- | :--- | :--- |
+| `sp_review_proposal` | Procedure (transaction) | Approve / reject / mark under review. Approval creates or updates the project. Rejection needs comments. |
+| `sp_allocate_guide` | Procedure (transaction, row locks) | Guide allocation with availability, capacity, duplicate and Primary hand-over rules. Used by the app. |
+| `sp_calculate_final_marks` | Procedure (transaction) | Weighted total per student (avg over evaluators ÷ max × weightage). Grade `IP` until every milestone is evaluated. |
+| `fn_grade` | Function | Score → O / A+ / A / B+ / B / C / F |
+| `trg_proposals_before_insert` | Trigger | Only active members can submit; one pending proposal at a time; none after approval; auto version |
+| `trg_proposals_after_insert/update` | Trigger | Notifies coordinators of new proposals and group members of decisions |
+| `trg_milestones_before_insert/update` | Trigger | Total weightage per academic year ≤ 100 % |
+| `trg_submissions_before_insert` | Trigger | **Late-submission detection**, auto version, submitter must be in the group, project must be approved |
+| `trg_submissions_after_insert/update` | Trigger | Moves project to *In Progress*; notifies guides (late or on time) and the group |
+| `trg_evaluations_before_insert` | Trigger | Only an allocated guide may evaluate |
+| `trg_student_evaluations_before_insert/update` | Trigger | Marks between 0 and the milestone maximum; student must be in the group |
+| `trg_allocations_before_insert/update` | Trigger | Capacity guard even for rows written outside the procedure |
+
+### Reports ([`db/003_views.sql`](db/003_views.sql))
+`v_project_primary_mentor` (helper), `v_project_progress`, `v_milestone_completion`, `v_pending_submissions`, `v_mentor_workload`, `v_evaluation_summary`, `v_student_milestone_marks`, `v_final_results` and `v_dashboard_summary`. These cover the project-status, milestone-completion, pending-submission, faculty-workload, evaluation-summary and final-marks reports, plus the coordinator dashboard (active / delayed / pending / completed). Each one is shown under **Reports** and can be downloaded as CSV.
+
+### Phase 4 API Endpoints
+| Endpoint | Method | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/student/proposals` | `POST` | Student | Submit a proposal for the student's group |
+| `/api/student/submissions` | `POST` | Student | Submit a milestone document link (new version each time) |
+| `/api/admin/proposals` | `GET` | Coordinator, Admin | List proposals (`?status=Pending`, …) and counts |
+| `/api/admin/proposals/[id]` | `PATCH` | Coordinator, Admin | `{ decision, comments }` → `sp_review_proposal` |
+| `/api/admin/milestones` | `GET`, `POST` | Coordinator, Admin | List / create milestones |
+| `/api/admin/milestones/[id]` | `PATCH`, `DELETE` | Coordinator, Admin | Edit; delete only when unused |
+| `/api/admin/submissions` | `GET` | Coordinator, Admin | All submissions (`?status=`, `?late=1`) |
+| `/api/admin/reports/[report]` | `GET` | Coordinator, Admin | Report rows; `?format=csv` downloads |
+| `/api/admin/projects/[id]/final-marks` | `POST` | Coordinator, Admin | Re-run `sp_calculate_final_marks` |
+| `/api/mentor/submissions/[id]` | `PATCH` | Mentor (allocated) | Accept / request revision / under review, with feedback |
+| `/api/mentor/evaluations` | `GET`, `PUT` | Mentor (allocated) | Marks sheet; save per-student marks |
+| `/api/notifications` | `GET`, `POST` | Any signed-in user | List; mark all read |
+
+Coordinators can also use the project and mentor APIs from Phase 3 (guide allocation). Student and group record management stays Admin-only.
+
+### Running Phase 4 Automated Tests
+```bash
+npm run test:phase4
+```
+48 checks: RBAC, the weightage trigger, proposal triggers, proposal review and resubmission versions, guide allocation, late detection and versioning, mentor review authorisation, the marks trigger, final-mark arithmetic and grades, every report plus the CSV export, notifications, and the milestone deletion guard.
+
+### Where each DBMS concept is shown
+| Concept | Where |
+| :--- | :--- |
+| 3NF, PK / FK, UNIQUE, CHECK | `db/001_core_schema.sql`, `db/002_workflow_schema.sql` |
+| Joins, aggregates, subqueries, CASE | `db/003_views.sql` (e.g. `v_project_progress`) |
+| Views | `db/003_views.sql` (9 views) |
+| Indexes | inline `INDEX` in 002 and `cpms_add_index(...)` calls |
+| Triggers | `db/004_triggers_procedures.sql` (13 triggers) |
+| Stored procedures and a function | `sp_allocate_guide`, `sp_review_proposal`, `sp_calculate_final_marks`, `fn_grade` |
+| Transactions | `START TRANSACTION … COMMIT / ROLLBACK` inside each procedure; `withTransaction()` in `src/lib/mysql.ts` |
 

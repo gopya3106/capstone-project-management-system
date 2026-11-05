@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { MentorDetailsView } from "@/components/admin/MentorDetailsView";
@@ -13,8 +13,9 @@ interface Props {
 }
 
 export default async function AdminMentorDetailPage({ params }: Props) {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireStaff();
   } catch {
     redirect("/login");
   }
@@ -60,7 +61,7 @@ export default async function AdminMentorDetailPage({ params }: Props) {
         </div>
 
         {/* Admin Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Interactive Mentor Details View */}
         <MentorDetailsView initialMentor={mentor} />

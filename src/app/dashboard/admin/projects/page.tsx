@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { ProjectListingTable } from "@/components/admin/ProjectListingTable";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminProjectsPage() {
   let session;
   try {
-    session = await requireAdmin();
+    session = await requireStaff();
   } catch {
     redirect("/login");
   }
@@ -53,7 +53,7 @@ export default async function AdminProjectsPage() {
         </header>
 
         {/* Admin Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Project Metrics Summary */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

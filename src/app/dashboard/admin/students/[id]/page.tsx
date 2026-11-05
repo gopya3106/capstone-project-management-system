@@ -12,8 +12,9 @@ interface Props {
 }
 
 export default async function StudentDetailPage({ params }: Props) {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireAdmin();
   } catch {
     redirect("/login");
   }
@@ -69,7 +70,7 @@ export default async function StudentDetailPage({ params }: Props) {
         </header>
 
         {/* Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Two-Column Grid */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

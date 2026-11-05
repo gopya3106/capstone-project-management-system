@@ -10,7 +10,11 @@
     "provision:admin": "node scripts/provision-demo-admin.mjs",
     "test:auth": "node scripts/verify-auth-flows.mjs",
     "test:phase2": "node scripts/verify-phase2.mjs",
-    "test:phase3": "node scripts/verify-phase3.mjs"
+    "test:phase3": "node scripts/verify-phase3.mjs",
+    "db:setup": "node scripts/db-setup.mjs",
+    "db:reset": "node scripts/db-setup.mjs --reset --seed",
+    "test:phase4": "node scripts/verify-phase4.mjs",
+    "test:all": "npm run test:auth && npm run test:phase2 && npm run test:phase3 && npm run test:phase4"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

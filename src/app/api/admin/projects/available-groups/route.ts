@@ -16,9 +16,9 @@ export async function GET() {
       { status: 401 }
     );
   }
-  if (session.role !== "Admin") {
+  if (session.role !== "Admin" && session.role !== "Coordinator") {
     return NextResponse.json(
-      { success: false, message: "Access denied. Administrator privileges required." },
+      { success: false, message: "Access denied. Administrator or coordinator privileges required." },
       { status: 403 }
     );
   }

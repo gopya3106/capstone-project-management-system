@@ -9,8 +9,9 @@ import { getAvailableStudents } from "@/lib/students";
 export const dynamic = "force-dynamic";
 
 export default async function NewGroupPage() {
+  let session;
   try {
-    await requireAdmin();
+    session = await requireAdmin();
   } catch {
     redirect("/login");
   }
@@ -47,7 +48,7 @@ export default async function NewGroupPage() {
         </header>
 
         {/* Navigation */}
-        <AdminNav />
+        <AdminNav role={session.role} />
 
         {/* Group Creation Form */}
         <CreateGroupForm availableStudents={availableStudents} />

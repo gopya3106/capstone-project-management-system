@@ -110,7 +110,7 @@ async function main() {
     // Step A: Verify target user exists and is an Admin using parameterized SQL
     const checkSql = `
       SELECT user_id, email, role, account_status
-      FROM Users
+      FROM users
       WHERE LOWER(email) = LOWER(?)
       LIMIT 1
     `;
@@ -151,7 +151,7 @@ async function main() {
 
     // Step D: Update password_hash using parameterized SQL
     const updateSql = `
-      UPDATE Users
+      UPDATE users
       SET password_hash = ?
       WHERE user_id = ? AND role = 'Admin' AND LOWER(email) = LOWER(?)
     `;

@@ -97,4 +97,20 @@ export async function withTransaction<T>(
   }
 }
 
+/**
+ * Runs a callback on one dedicated pooled connection (no transaction).
+ * Needed for stored procedures that manage their own transaction and
+ * return values through session variables (OUT parameters).
+ */
+export async function withConnection<T>(
+  callback: (connection: mysql.PoolConnection) => Promise<T>
+): Promise<T> {
+  const connection = await getPool().getConnection();
+  try {
+    return await callback(connection);
+  } finally {
+    connection.release();
+  }
+}
+
 export default pool;

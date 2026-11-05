@@ -1,4 +1,4 @@
-import { query, withTransaction } from "@/lib/mysql";
+import { query, withTransaction, withConnection } from "@/lib/mysql";
 import {
   MentorListItem,
   MentorDetails,
@@ -9,7 +9,7 @@ import {
   MentorAssignedProject,
   MentorAllocationRecord,
 } from "./types";
-import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { RowDataPacket } from "mysql2";
 
 /**
  * Retrieves aggregate statistics for capstone mentors and allocations.
@@ -331,7 +331,7 @@ export async function getAvailableMentorsForProject(
 }
 
 /**
- * Assigns a mentor to a capstone project within a transaction.
+ * Assigns a mentor to a capstone project via the stored procedure sp_allocate_guide.
  *
  * Enforces:
  * 1. Project exists.
@@ -344,104 +344,27 @@ export async function assignMentorToProject(
   input: AssignMentorInput,
   allocatedByUserId: number
 ): Promise<{ success: boolean; allocation_id: number; message: string }> {
-  return await withTransaction(async (conn) => {
-    // 1. Verify project exists
-    const [projectRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT project_id, project_title, project_status FROM capstone_projects WHERE project_id = ? FOR UPDATE`,
-      [input.project_id]
-    );
-    if (!projectRows || projectRows.length === 0) {
-      throw new Error(`Project with ID ${input.project_id} not found.`);
+  // All rules (availability, capacity, duplicate, Primary hand-over) live in
+  // the stored procedure sp_allocate_guide, which runs its own transaction.
+  return withConnection(async (conn) => {
+    try {
+      await conn.query("CALL sp_allocate_guide(?, ?, ?, ?, ?, @cpms_allocation_id)", [
+        input.project_id,
+        input.mentor_id,
+        input.mentor_role,
+        allocatedByUserId,
+        input.remarks || null,
+      ]);
+      const [rows] = await conn.query<RowDataPacket[]>("SELECT @cpms_allocation_id AS allocation_id");
+      return {
+        success: true,
+        allocation_id: Number(rows[0]?.allocation_id),
+        message: `Mentor successfully assigned as ${input.mentor_role}.`,
+      };
+    } catch (error: unknown) {
+      const sqlMessage = (error as { sqlMessage?: string }).sqlMessage;
+      throw new Error(sqlMessage || (error instanceof Error ? error.message : "Allocation failed."));
     }
-
-    // 2. Verify mentor exists and lock
-    const [mentorRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT mentor_id, max_projects, availability_status FROM capstone_mentors WHERE mentor_id = ? FOR UPDATE`,
-      [input.mentor_id]
-    );
-    if (!mentorRows || mentorRows.length === 0) {
-      throw new Error(`Mentor with ID ${input.mentor_id} not found.`);
-    }
-    const mentor = mentorRows[0];
-
-    if (mentor.availability_status !== "Available") {
-      throw new Error("Mentor is currently marked as Unavailable.");
-    }
-
-    // Check active workload
-    const [workloadRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS active_count FROM mentor_allocations WHERE mentor_id = ? AND allocation_status = 'Active'`,
-      [input.mentor_id]
-    );
-    const activeCount = Number(workloadRows[0]?.active_count || 0);
-
-    // 3. Check if mentor is already actively allocated to this project
-    const [existingMentorAlloc] = await conn.execute<RowDataPacket[]>(
-      `SELECT allocation_id, mentor_role, allocation_status FROM mentor_allocations WHERE project_id = ? AND mentor_id = ? FOR UPDATE`,
-      [input.project_id, input.mentor_id]
-    );
-
-    if (existingMentorAlloc.length > 0 && existingMentorAlloc[0].allocation_status === "Active") {
-      throw new Error(
-        `This mentor is already actively assigned as ${existingMentorAlloc[0].mentor_role} to this project.`
-      );
-    }
-
-    // Capacity check: if not already active on this project, ensure activeCount < max_projects
-    if (activeCount >= mentor.max_projects) {
-      throw new Error(
-        `Mentor has reached maximum workload capacity (${activeCount}/${mentor.max_projects} active projects).`
-      );
-    }
-
-    // 4. If role is 'Primary', transition any existing active primary mentor to 'Ended'
-    if (input.mentor_role === "Primary") {
-      const [existingPrimary] = await conn.execute<RowDataPacket[]>(
-        `SELECT allocation_id, mentor_id FROM mentor_allocations WHERE project_id = ? AND mentor_role = 'Primary' AND allocation_status = 'Active' FOR UPDATE`,
-        [input.project_id]
-      );
-
-      if (existingPrimary.length > 0) {
-        const prevId = existingPrimary[0].allocation_id;
-        await conn.execute(
-          `UPDATE mentor_allocations
-           SET allocation_status = 'Ended', end_date = CURDATE(), remarks = CONCAT(COALESCE(remarks, ''), ' [Replaced by new Primary Mentor]')
-           WHERE allocation_id = ?`,
-          [prevId]
-        );
-      }
-    }
-
-    // 5. Upsert or Insert allocation (due to UNIQUE KEY uq_project_mentor (project_id, mentor_id))
-    let allocationId: number;
-    if (existingMentorAlloc.length > 0) {
-      allocationId = existingMentorAlloc[0].allocation_id;
-      await conn.execute(
-        `UPDATE mentor_allocations
-         SET mentor_role = ?,
-             allocation_status = 'Active',
-             allocation_date = CURDATE(),
-             end_date = NULL,
-             allocated_by = ?,
-             remarks = ?
-         WHERE allocation_id = ?`,
-        [input.mentor_role, allocatedByUserId, input.remarks || null, allocationId]
-      );
-    } else {
-      const [insertResult] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO mentor_allocations (
-           project_id, mentor_id, allocated_by, allocation_date, mentor_role, allocation_status, remarks
-         ) VALUES (?, ?, ?, CURDATE(), ?, 'Active', ?)`,
-        [input.project_id, input.mentor_id, allocatedByUserId, input.mentor_role, input.remarks || null]
-      );
-      allocationId = insertResult.insertId;
-    }
-
-    return {
-      success: true,
-      allocation_id: allocationId,
-      message: `Mentor successfully assigned as ${input.mentor_role}.`,
-    };
   });
 }
 
